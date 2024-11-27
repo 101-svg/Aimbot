@@ -1,0 +1,110 @@
+local Camera = workspace.CurrentCamera
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local LocalPlayer = Players.LocalPlayer
+
+local Holding = false
+local connection
+
+-- Aimbot Settings
+_G.AimbotEnabled = false
+_G.TeamCheck = false
+_G.AimPart = "Head"
+_G.Sensitivity = 0.01 -- Adjust sensitivity if needed
+
+-- FOV Circle Settings
+_G.CircleSides = 64
+_G.CircleColor = Color3.fromRGB(255, 255, 255)
+_G.CircleTransparency = 0.7
+_G.CircleRadius = 80
+_G.CircleFilled = false
+_G.CircleVisible = true
+_G.CircleThickness = 0
+
+-- FOV Circle
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+FOVCircle.Radius = _G.CircleRadius
+FOVCircle.Filled = _G.CircleFilled
+FOVCircle.Color = _G.CircleColor
+FOVCircle.Visible = _G.CircleVisible
+FOVCircle.Transparency = _G.CircleTransparency
+FOVCircle.NumSides = _G.CircleSides
+FOVCircle.Thickness = _G.CircleThickness
+
+-- Function to find the closest player's head
+local function findClosestPlayerHead()
+    local closestPlayer = nil
+    local closestDistance = G.CircleRadius
+
+    for , player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            if _G.TeamCheck == false or player.Team ~= LocalPlayer.Team then
+                local head = player.Character.Head
+                local screenPoint = Camera:WorldToScreenPoint(head.Position)
+                local distance = (Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y) - Vector2.new(screenPoint.X, screenPoint.Y)).Magnitude
+
+                if distance < closestDistance then
+                    closestDistance = distance
+                    closestPlayer = head
+                end
+            end
+        end
+    end
+
+    return closestPlayer
+end
+
+-- Function to lock the cursor to the closest player's head
+local function lockCursorToClosestHead()
+    local closestHead = findClosestPlayerHead()
+    if closestHead then
+        connection = RunService.RenderStepped:Connect(function()
+            local camera = workspace.CurrentCamera
+            TweenService:Create(camera, TweenInfo.new(_G.Sensitivity, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {CFrame = CFrame.new(camera.CFrame.Position, closestHead.Position)}):Play()
+        end)
+    end
+end
+
+-- Function to unlock the cursor
+local function unlockCursor()
+    if connection then
+        connection:Disconnect()
+        connection = nil
+    end
+end
+
+-- Update the FOV circle position and properties
+RunService.RenderStepped:Connect(function()
+    FOVCircle.Position = Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y)
+    FOVCircle.Radius = _G.CircleRadius
+    FOVCircle.Filled = _G.CircleFilled
+    FOVCircle.Color = _G.CircleColor
+    FOVCircle.Visible = _G.CircleVisible
+    FOVCircle.Transparency = _G.CircleTransparency
+    FOVCircle.NumSides = _G.CircleSides
+    FOVCircle.Thickness = _G.CircleThickness
+
+    if Holding and _G.AimbotEnabled then
+        lockCursorToClosestHead()
+    elseif not Holding then
+        unlockCursor()
+    end
+end)
+
+-- Handle mouse button press for locking
+UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 and not gameProcessedEvent then
+        Holding = true
+        lockCursorToClosestHead()
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        Holding = false
+        unlockCursor()
+    end
+end)
