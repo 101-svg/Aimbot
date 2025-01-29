@@ -1,3 +1,5 @@
+-- discord .tzproject
+
 local Camera = workspace.CurrentCamera
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -12,7 +14,7 @@ local connection
 _G.AimbotEnabled = false
 _G.TeamCheck = false
 _G.AimPart = "Head"
-_G.Sensitivity = 0.01 -- Adjust sensitivity if needed
+_G.Sensitivity = 0.0 -- Adjust sensitivity if needed
 
 -- FOV Circle Settings
 _G.CircleSides = 64
@@ -34,21 +36,24 @@ FOVCircle.Transparency = _G.CircleTransparency
 FOVCircle.NumSides = _G.CircleSides
 FOVCircle.Thickness = _G.CircleThickness
 
--- Function to find the closest player's head
-local function findClosestPlayerHead()
+-- Function to find the closest player's head to the center of the screen
+local function findClosestPlayerHeadToCenter()
     local closestPlayer = nil
-    local closestDistance = G.CircleRadius
+    local closestDistance = _G.CircleRadius
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
-    for , player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild(_G.AimPart) then
             if _G.TeamCheck == false or player.Team ~= LocalPlayer.Team then
-                local head = player.Character.Head
-                local screenPoint = Camera:WorldToScreenPoint(head.Position)
-                local distance = (Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y) - Vector2.new(screenPoint.X, screenPoint.Y)).Magnitude
+                local part = player.Character[_G.AimPart]
+                local screenPoint, onScreen = Camera:WorldToScreenPoint(part.Position)
 
-                if distance < closestDistance then
-                    closestDistance = distance
-                    closestPlayer = head
+                if onScreen then
+                    local distance = (screenCenter - Vector2.new(screenPoint.X, screenPoint.Y)).Magnitude
+                    if distance < closestDistance then
+                        closestDistance = distance
+                        closestPlayer = part
+                    end
                 end
             end
         end
@@ -59,7 +64,7 @@ end
 
 -- Function to lock the cursor to the closest player's head
 local function lockCursorToClosestHead()
-    local closestHead = findClosestPlayerHead()
+    local closestHead = findClosestPlayerHeadToCenter()
     if closestHead then
         connection = RunService.RenderStepped:Connect(function()
             local camera = workspace.CurrentCamera
@@ -76,9 +81,36 @@ local function unlockCursor()
     end
 end
 
+-- Function to self-destroy the script
+local function selfDestroy()
+    -- Disconnect active aimbot logic
+    unlockCursor()
+
+    -- Remove visuals
+    if FOVCircle then
+        FOVCircle:Remove()
+    end
+
+    -- Reset global variables
+    _G.AimbotEnabled = false
+    _G.TeamCheck = false
+    _G.AimPart = nil
+    _G.CircleSides = nil
+    _G.CircleColor = nil
+    _G.CircleTransparency = nil
+    _G.CircleRadius = nil
+    _G.CircleFilled = nil
+    _G.CircleVisible = nil
+    _G.CircleThickness = nil
+    _G.Sensitivity = nil
+
+    -- Destroy the script
+    script:Destroy()
+end
+
 -- Update the FOV circle position and properties
 RunService.RenderStepped:Connect(function()
-    FOVCircle.Position = Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y)
+    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     FOVCircle.Radius = _G.CircleRadius
     FOVCircle.Filled = _G.CircleFilled
     FOVCircle.Color = _G.CircleColor
@@ -99,6 +131,8 @@ UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
     if input.UserInputType == Enum.UserInputType.MouseButton2 and not gameProcessedEvent then
         Holding = true
         lockCursorToClosestHead()
+    elseif input.KeyCode == Enum.KeyCode.PageUp then
+        selfDestroy() -- Destroy the script when PageUp is pressed
     end
 end)
 
